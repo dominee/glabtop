@@ -20,9 +20,9 @@ const minChartDistFromBG = 0.18
 
 var themeChartPaletteCache sync.Map // *Theme -> []lipgloss.Color
 
-// ChartPalette returns up to n colors from the loaded btop theme, chosen to be
-// well separated in Lab space so stacked segments remain distinguishable while
-// staying on-theme. Cached per Theme pointer.
+// ChartPalette returns up to n colors for charts. It first takes colors from the
+// Starship Catppuccin Powerline rainbow (Mocha hexes), then fills remaining slots with
+// the theme-driven Lab-spread generative algorithm. Cached per Theme pointer.
 func (t *Theme) ChartPalette(n int) []lipgloss.Color {
 	if t == nil || n < 1 {
 		return nil
@@ -48,7 +48,83 @@ func (t *Theme) ChartPalette(n int) []lipgloss.Color {
 	return out
 }
 
+// starshipCatppuccinPowerlineRainbow is the Catppuccin Mocha hex order used by the Starship
+// "Catppuccin Powerline" preset (powerline segment backgrounds: os → dir → git → langs → conda → time),
+// plus mauve and pink from the same palette for charts that need more than six colors.
+// https://starship.rs/presets/catppuccin-powerline
+var starshipCatppuccinPowerlineRainbow = []string{
+	"#f38ba8", // red — os / username
+	"#fab387", // peach — directory
+	"#f9e2af", // yellow — git
+	"#a6e3a1", // green — language modules
+	"#74c7ec", // sapphire — conda / docker_context
+	"#b4befe", // lavender — time
+	"#cba6f7", // mauve — palette accent
+	"#f5c2e7", // pink — palette accent
+}
+
 func buildChartPaletteForTheme(t *Theme, n int) []lipgloss.Color {
+	bg, bgHex, hasBg := chartExcludeBackground(t)
+	seen := make(map[string]struct{})
+	out := make([]lipgloss.Color, 0, n)
+
+	appendIf := func(c colorful.Color) bool {
+		if len(out) >= n {
+			return false
+		}
+		hex := strings.ToLower(c.Hex())
+		if _, ok := seen[hex]; ok {
+			return false
+		}
+		if tooCloseToBackground(c, hex, bg, bgHex, hasBg) {
+			return false
+		}
+		_, s, l := c.Hsl()
+		if l < 0.07 || l > 0.94 || s < 0.11 {
+			return false
+		}
+		seen[hex] = struct{}{}
+		out = append(out, lipgloss.Color(hex))
+		return true
+	}
+
+	for _, h := range starshipCatppuccinPowerlineRainbow {
+		if len(out) >= n {
+			break
+		}
+		c, err := colorful.Hex(h)
+		if err != nil {
+			continue
+		}
+		appendIf(c)
+	}
+
+	if len(out) >= n {
+		return out[:n]
+	}
+
+	gen := buildChartPaletteGenerative(t, n)
+	for _, col := range gen {
+		if len(out) >= n {
+			break
+		}
+		c, err := colorful.Hex(strings.TrimSpace(string(col)))
+		if err != nil {
+			continue
+		}
+		appendIf(c)
+	}
+
+	if len(out) == 0 {
+		return fallbackChartPalette(t, n)
+	}
+	for len(out) < n {
+		out = append(out, out[len(out)-1])
+	}
+	return out[:n]
+}
+
+func buildChartPaletteGenerative(t *Theme, n int) []lipgloss.Color {
 	bg, bgHex, hasBg := chartExcludeBackground(t)
 	hexes := distinctChartCandidateHexes(t)
 	cols := parseAndFilterChartColors(hexes, bg, bgHex, hasBg)

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestChartPaletteUsesOnlyThemeColors(t *testing.T) {
+func TestChartPaletteLen(t *testing.T) {
 	tm := &Theme{Colors: map[string]string{
 		"c1": "#ff6b6b",
 		"c2": "#4ecdc4",
@@ -52,19 +52,20 @@ func TestChartPaletteExcludesBackground(t *testing.T) {
 	}
 }
 
-func TestChartPaletteTypeSegmentsSpreadDistinct(t *testing.T) {
+func TestChartPaletteStarshipRainbowThenGenerative(t *testing.T) {
 	tm := &Theme{Colors: map[string]string{
-		"main_bg": "#1e1e2e",
+		"main_bg": "#2d3436",
 		"hi_fg":   "#89b4fa",
 	}}
 	p := tm.ChartPalette(8)
-	if len(p) < 7 {
-		t.Fatalf("len %d", len(p))
+	if strings.ToLower(string(p[0])) != "#f38ba8" {
+		t.Fatalf("first slot should be Starship catppuccin red, got %q", p[0])
 	}
+	// Later slots use generative / theme fill; still distinct type-chart indices.
 	a := strings.ToLower(string(p[0]))
 	b := strings.ToLower(string(p[3]))
 	c := strings.ToLower(string(p[6]))
 	if a == b || b == c || a == c {
-		t.Fatalf("indices 0,3,6 must differ for type chart: %q %q %q", a, b, c)
+		t.Fatalf("indices 0,3,6: %q %q %q", a, b, c)
 	}
 }
