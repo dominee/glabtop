@@ -36,3 +36,28 @@ func TestUserLabel(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestDistinctUserCount(t *testing.T) {
+	m := map[int64]map[string]int{
+		1: {"alice": 1, "bob": 1},
+		2: {"bob": 2, "cara": 1},
+	}
+	if n := DistinctUserCount(m); n != 3 {
+		t.Fatalf("got %d want 3", n)
+	}
+	if DistinctUserCount(nil) != 0 || DistinctUserCount(map[int64]map[string]int{}) != 0 {
+		t.Fatal()
+	}
+}
+
+func TestIssueChartActor(t *testing.T) {
+	if got := IssueChartActor(IssueRow{AssigneeName: "Sam", AuthorName: "Ann"}); got != "Sam" {
+		t.Fatal(got)
+	}
+	if got := IssueChartActor(IssueRow{AuthorName: "Pat"}); got != "Pat" {
+		t.Fatal(got)
+	}
+	if got := IssueChartActor(IssueRow{}); got != "unknown" {
+		t.Fatal(got)
+	}
+}
