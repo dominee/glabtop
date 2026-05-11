@@ -58,6 +58,7 @@ type Model struct {
 	showIssues       bool
 	detailPane       bool
 	listCommitActive bool
+	chartByUser      bool
 
 	projectFilter string
 	userFilter    string
@@ -104,6 +105,7 @@ func NewModel(cfg config.File, cfgPath string, thm *th.Theme, client *gitlab.Cli
 		showCommits:      st.ShowCommits,
 		showIssues:       st.ShowIssues,
 		detailPane:       st.DetailPane,
+		chartByUser:      st.ChartByUser,
 		listCommitActive: true,
 		fi:               ti,
 		refreshEvery:     time.Duration(cfg.UI.RefreshIntervalSec) * time.Second,
@@ -240,6 +242,7 @@ func (m *Model) enrichSeriesFromDB() {
 	}
 	m.snapshot.Series = series
 	m.snapshot.Counts = model.NormalizeSeries(series)
+	m.snapshot.UserChart = nil
 }
 
 // Update implements tea.Model.
@@ -334,6 +337,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.persist.ShowCommits = m.showCommits
 			m.persist.ShowIssues = m.showIssues
 			m.persist.DetailPane = m.detailPane
+			m.persist.ChartByUser = m.chartByUser
 			_ = config.SaveState(m.cfgPath, m.persist)
 			return m, tea.Quit
 		case "t":
@@ -355,6 +359,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "p":
 			m.paused = !m.paused
+			return m, nil
+		case "u":
+			m.chartByUser = !m.chartByUser
 			return m, nil
 		case "1":
 			m.showStats = !m.showStats

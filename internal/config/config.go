@@ -169,6 +169,7 @@ type PersistedUIState struct {
 	ShowCommits bool            `toml:"show_commits"`
 	ShowIssues  bool            `toml:"show_issues"`
 	DetailPane  bool            `toml:"detail_pane"`
+	ChartByUser bool            `toml:"chart_by_user"`
 }
 
 func StatePath(configPath string) string {
@@ -186,6 +187,7 @@ func LoadState(configPath string) (PersistedUIState, error) {
 				ShowCommits: true,
 				ShowIssues:  true,
 				DetailPane:  false,
+				ChartByUser: false,
 			}, nil
 		}
 		return PersistedUIState{}, err

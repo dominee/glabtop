@@ -26,6 +26,7 @@ type bucketAgg struct {
 	c  map[int64]int
 	m  map[int64]int
 	i  map[int64]int
+	u  map[int64]map[string]int
 }
 
 func newBucketAgg() *bucketAgg {
@@ -33,6 +34,7 @@ func newBucketAgg() *bucketAgg {
 		c: make(map[int64]int),
 		m: make(map[int64]int),
 		i: make(map[int64]int),
+		u: make(map[int64]map[string]int),
 	}
 }
 
@@ -48,6 +50,34 @@ func (a *bucketAgg) add(tr model.TimeRange, kind byte, ts time.Time) {
 	case 'i':
 		a.i[k]++
 	}
+}
+
+func (a *bucketAgg) addUser(tr model.TimeRange, ts time.Time, label string) {
+	k := model.BucketStart(ts, tr).Unix()
+	label = strings.TrimSpace(label)
+	if label == "" {
+		label = "unknown"
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.u[k] == nil {
+		a.u[k] = make(map[string]int)
+	}
+	a.u[k][label]++
+}
+
+func (a *bucketAgg) userSnapshot() map[int64]map[string]int {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	out := make(map[int64]map[string]int, len(a.u))
+	for k, inner := range a.u {
+		cp := make(map[string]int, len(inner))
+		for u, v := range inner {
+			cp[u] = v
+		}
+		out[k] = cp
+	}
+	return out
 }
 
 func (a *bucketAgg) maps() (commits, merges, issues map[int64]int) {
@@ -273,6 +303,7 @@ func (c *Client) FetchSnapshot(ctx context.Context, projects []model.ProjectRef,
 					continue
 				}
 				localAgg.add(tr, 'c', cm.CreatedAt)
+				localAgg.addUser(tr, cm.CreatedAt, model.UserLabel(cm.AuthorName, cm.AuthorEmail))
 				cm.ProjectPath = p.PathWithNamespace
 				filteredCommits = append(filteredCommits, cm)
 			}
@@ -291,6 +322,7 @@ func (c *Client) FetchSnapshot(ctx context.Context, projects []model.ProjectRef,
 					continue
 				}
 				localAgg.add(tr, 'i', is.ClosedAt)
+				localAgg.addUser(tr, is.ClosedAt, model.IssueChartActor(is))
 				is.ProjectPath = p.PathWithNamespace
 				filteredIssues = append(filteredIssues, is)
 			}
@@ -311,6 +343,8 @@ func (c *Client) FetchSnapshot(ctx context.Context, projects []model.ProjectRef,
 	cArr, mArr, iArr := globalAgg.maps()
 	series := model.SeriesFromMaps(since, until, tr, cArr, mArr, iArr)
 	counts := model.NormalizeSeries(series)
+	userBuckets := globalAgg.userSnapshot()
+	userChart := model.BuildUserChartFromAgg(since, until, tr, userBuckets, model.ChartTopUsers)
 
 	model.SortCommitsByTimeDesc(allCommits)
 	model.SortIssuesByTimeDesc(allIssues)
@@ -325,6 +359,7 @@ func (c *Client) FetchSnapshot(ctx context.Context, projects []model.ProjectRef,
 		FetchedUnix:  time.Now().Unix(),
 		Stale:        false,
 		Series:       series,
+		UserChart:    userChart,
 		Commits:      allCommits,
 		Issues:       allIssues,
 		Counts:       counts,
@@ -334,6 +369,7 @@ func (c *Client) FetchSnapshot(ctx context.Context, projects []model.ProjectRef,
 
 func mergeMaps(dst, src *bucketAgg) {
 	sc, sm, si := src.maps()
+	su := src.userSnapshot()
 	dst.mu.Lock()
 	defer dst.mu.Unlock()
 	for k, v := range sc {
@@ -344,6 +380,14 @@ func mergeMaps(dst, src *bucketAgg) {
 	}
 	for k, v := range si {
 		dst.i[k] += v
+	}
+	for k, inner := range su {
+		if dst.u[k] == nil {
+			dst.u[k] = make(map[string]int)
+		}
+		for u, v := range inner {
+			dst.u[k][u] += v
+		}
 	}
 }
 
@@ -459,6 +503,7 @@ func (c *Client) collectMergedMRs(ctx context.Context, p model.ProjectRef, since
 					continue
 				}
 				agg.add(tr, 'm', m)
+				agg.addUser(tr, m, strings.TrimSpace(mr.Author.Name))
 			}
 		}
 		if stopPaging || len(chunk) < c.perPage {

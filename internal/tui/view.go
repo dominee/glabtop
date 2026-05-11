@@ -36,7 +36,7 @@ func renderView(m *Model) string {
 		b.WriteString("\n")
 	}
 
-	help := st.Inactive.Render("[t] range [r] refresh [p] pause [1-3] panes [d] detail [Tab] focus [/] filter [q] quit")
+	help := st.Inactive.Render("[t] range [r] refresh [p] pause [u] user chart [1-3] panes [d] detail [Tab] focus [/] filter [q] quit")
 	b.WriteString(help)
 	if m.filterFocus {
 		b.WriteString("\n")
@@ -156,16 +156,31 @@ func statsBlock(m *Model, w int) string {
 		return box.Render(st.Title.Render(" Activity ") + "\n" + st.Inactive.Render(line))
 	}
 	title := st.Title.Render(" Activity — time →  ")
+	canUC := m.snapshot.UserChart != nil && len(m.snapshot.UserChart.Users) > 0
+	useUser := m.chartByUser && canUC
+	note := ""
+	if m.chartByUser && !canUC {
+		note = st.Inactive.Render("by-user breakdown unavailable — showing by type") + "\n"
+	}
+	if useUser {
+		title = st.Title.Render(" Activity (by user) — time →  ")
+	}
 	innerChartW := w - 2
 	if innerChartW < 4 {
 		innerChartW = 4
 	}
 	chart := stackedTimeSeriesChart(m, innerChartW, 8)
-	legend := chartLegend(m)
-	return box.Render(title + "\n" + chart + "\n" + legend)
+	if useUser {
+		chart = stackedUserChart(m, innerChartW, 8)
+	}
+	legend := typeChartLegend(m)
+	if useUser {
+		legend = userChartLegend(m)
+	}
+	return box.Render(title + "\n" + note + chart + "\n" + legend)
 }
 
-func chartLegend(m *Model) string {
+func typeChartLegend(m *Model) string {
 	st := m.styles
 	c := lipgloss.NewStyle().Foreground(st.MeterLow).Render("██")
 	cm := lipgloss.NewStyle().Foreground(st.MeterMid).Render("██")
@@ -220,7 +235,7 @@ func stackedTimeSeriesChart(m *Model, width, height int) string {
 	commitStyle := lipgloss.NewStyle().Foreground(st.MeterLow)
 	mergeStyle := lipgloss.NewStyle().Foreground(st.MeterMid)
 	issueStyle := lipgloss.NewStyle().Foreground(st.MeterHigh)
-	emptyCh := lipgloss.NewStyle().Foreground(lipgloss.Color("#6C7086")).Render("░")
+	rulerCh := lipgloss.NewStyle().Foreground(lipgloss.Color(m.theme.Hex("div_line", "#6C7086"))).Render("─")
 
 	var rows []string
 	for row := 0; row < height; row++ {
@@ -243,7 +258,7 @@ func stackedTimeSeriesChart(m *Model, width, height int) string {
 			hC, hM, _ := splitStack(colH, b.Commits, b.Merges, b.ClosedIssues, tot)
 			for k := 0; k < colW; k++ {
 				if fromBottom >= colH {
-					line.WriteString(emptyCh)
+					line.WriteString(rulerCh)
 					continue
 				}
 				seg := fromBottom
@@ -273,6 +288,145 @@ func stackedTimeSeriesChart(m *Model, width, height int) string {
 	rows = append(rows, axis.String())
 
 	return strings.Join(rows, "\n")
+}
+
+func stackedUserChart(m *Model, width, height int) string {
+	st := m.styles
+	uc := m.snapshot.UserChart
+	if uc == nil || len(uc.Buckets) == 0 || width == 0 {
+		return ""
+	}
+	v := uc.Buckets
+	maxTotal := uc.MaxTotal
+	if maxTotal < 1 {
+		maxTotal = 1
+	}
+	axisBodyW := len(strconv.Itoa(maxTotal))
+	if axisBodyW < 1 {
+		axisBodyW = 1
+	}
+	axisW := axisBodyW + 1
+	plotW := width - axisW
+	if plotW < 1 {
+		plotW = 1
+	}
+	colWidths := columnWidths(len(v), plotW)
+	rulerCh := lipgloss.NewStyle().Foreground(lipgloss.Color(m.theme.Hex("div_line", "#6C7086"))).Render("─")
+
+	var rows []string
+	for row := 0; row < height; row++ {
+		var line strings.Builder
+		line.WriteString(yAxisPrefix(row, height, maxTotal, axisBodyW, axisW, st.Inactive))
+		fromBottom := height - 1 - row
+		for j, b := range v {
+			colW := colWidths[j]
+			if colW == 0 {
+				continue
+			}
+			tot := 0
+			for _, c := range b.Counts {
+				tot += c
+			}
+			colH := 0
+			if maxTotal > 0 {
+				colH = tot * height / maxTotal
+			}
+			if tot > 0 && colH == 0 {
+				colH = 1
+			}
+			heights := splitUserStack(colH, tot, b.Counts)
+			for k := 0; k < colW; k++ {
+				if fromBottom >= colH {
+					line.WriteString(rulerCh)
+					continue
+				}
+				si := userSegmentAt(fromBottom, heights)
+				if si < 0 {
+					line.WriteString(rulerCh)
+					continue
+				}
+				col := lipgloss.NewStyle().Foreground(chartUserColor(m, si)).Render("█")
+				line.WriteString(col)
+			}
+		}
+		rows = append(rows, line.String())
+	}
+
+	var axis strings.Builder
+	axis.WriteString(strings.Repeat(" ", axisW))
+	for j, b := range v {
+		cw := colWidths[j]
+		if cw == 0 {
+			continue
+		}
+		lbl := bucketAxisLabel(m.tr, b.StartRFC3339, cw)
+		axis.WriteString(st.Inactive.Render(lbl))
+	}
+	rows = append(rows, axis.String())
+
+	return strings.Join(rows, "\n")
+}
+
+func splitUserStack(colH, tot int, counts []int) []int {
+	n := len(counts)
+	out := make([]int, n)
+	if n == 0 || tot <= 0 || colH <= 0 {
+		return out
+	}
+	rem := colH
+	for i := 0; i < n; i++ {
+		h := counts[i] * colH / tot
+		out[i] = h
+		rem -= h
+	}
+	for i := 0; i < n && rem > 0; i++ {
+		if counts[i] > 0 {
+			out[i]++
+			rem--
+		}
+	}
+	return out
+}
+
+func userSegmentAt(fromBottom int, heights []int) int {
+	acc := 0
+	for i, h := range heights {
+		if h <= 0 {
+			continue
+		}
+		next := acc + h
+		if fromBottom >= acc && fromBottom < next {
+			return i
+		}
+		acc = next
+	}
+	return -1
+}
+
+func chartUserColor(m *Model, i int) lipgloss.Color {
+	keys := []string{"cpu_start", "mem_start", "net_download", "proc", "gpu_start", "cpu_end", "mem_end", "net_upload"}
+	k := keys[i%len(keys)]
+	return lipgloss.Color(m.theme.Hex(k, "#89B4FA"))
+}
+
+func userChartLegend(m *Model) string {
+	st := m.styles
+	uc := m.snapshot.UserChart
+	if uc == nil || len(uc.Users) == 0 {
+		return st.Inactive.Render("users")
+	}
+	sep := st.Inactive.Render(" · ")
+	parts := make([]string, 0, len(uc.Users))
+	for i, u := range uc.Users {
+		runes := []rune(u)
+		name := u
+		if len(runes) > 12 {
+			name = string(runes[:11]) + "…"
+		}
+		sq := lipgloss.NewStyle().Foreground(chartUserColor(m, i)).Render("██")
+		parts = append(parts, sq+st.Inactive.Render(" "+name))
+	}
+	return strings.Join(parts, sep)
 }
 
 // yAxisPrefix returns a fixed-width left gutter for one chart row (scale labels).

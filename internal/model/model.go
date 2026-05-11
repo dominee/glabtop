@@ -140,14 +140,15 @@ type Counts struct {
 }
 
 type Snapshot struct {
-	WindowID     string       `json:"window_id"`
-	TimeRange    string       `json:"time_range"`
-	SinceRFC3339 string       `json:"since"`
-	UntilRFC3339 string       `json:"until"`
-	Counts       Counts       `json:"counts"`
-	Series       []TimeBucket `json:"series"`
-	Commits      []CommitRow  `json:"commits"`
-	Issues       []IssueRow   `json:"issues"`
-	FetchedUnix  int64        `json:"fetched_unix"`
-	Stale        bool         `json:"stale"`
+	WindowID     string           `json:"window_id"`
+	TimeRange    string           `json:"time_range"`
+	SinceRFC3339 string           `json:"since"`
+	UntilRFC3339 string           `json:"until"`
+	Counts       Counts           `json:"counts"`
+	Series       []TimeBucket     `json:"series"`
+	UserChart    *UserChartSeries `json:"user_chart,omitempty"`
+	Commits      []CommitRow      `json:"commits"`
+	Issues       []IssueRow       `json:"issues"`
+	FetchedUnix  int64            `json:"fetched_unix"`
+	Stale        bool             `json:"stale"`
 }
