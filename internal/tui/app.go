@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"glabtop/internal/cache"
 	"glabtop/internal/config"
@@ -121,6 +122,13 @@ func NewModel(cfg config.File, cfgPath string, thm *th.Theme, client *gitlab.Cli
 	m.commitList.SetShowStatusBar(false)
 	m.issueList.Title = "Closed issues"
 	m.issueList.SetShowStatusBar(false)
+	pal := thm.ChartPalette(8)
+	if len(pal) >= 2 {
+		m.commitList.Styles.Title = lipgloss.NewStyle().Bold(true).Foreground(pal[0]).Padding(0, 1)
+		m.issueList.Styles.Title = lipgloss.NewStyle().Bold(true).Foreground(pal[2]).Padding(0, 1)
+		m.commitList.Styles.TitleBar = lipgloss.NewStyle().Padding(0, 0, 1, 2)
+		m.issueList.Styles.TitleBar = lipgloss.NewStyle().Padding(0, 0, 1, 2)
+	}
 	if bootstrap != nil {
 		m.applySnapshot(bootstrap)
 	}
@@ -284,8 +292,8 @@ func (m *Model) applySnapshot(snap *model.Snapshot) {
 	}
 	m.snapshot = snap
 	m.enrichSeriesFromDB()
-	m.commitList.SetItems(commitItems(m.snapshot))
-	m.issueList.SetItems(issueItems(m.snapshot))
+		m.commitList.SetItems(commitItems(m.snapshot, m.theme))
+		m.issueList.SetItems(issueItems(m.snapshot, m.theme))
 }
 
 func (m *Model) enrichSeriesFromDB() {

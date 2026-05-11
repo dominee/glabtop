@@ -15,7 +15,6 @@ func renderView(m *Model) string {
 	if m.w == 0 {
 		return ""
 	}
-	st := m.styles
 
 	var b strings.Builder
 	b.WriteString(renderStatusBar(m))
@@ -36,11 +35,10 @@ func renderView(m *Model) string {
 		b.WriteString("\n")
 	}
 
-	help := st.Inactive.Render("[t] range [r] refresh [p] pause [u] user chart [1-3] panes [d] detail [Tab] focus [/] filter [q] quit")
-	b.WriteString(help)
+	b.WriteString(renderHelpLine(m))
 	if m.filterFocus {
 		b.WriteString("\n")
-		b.WriteString(st.Hi.Render("filter: "))
+		b.WriteString(m.paletteBold(3).Render("filter: "))
 		b.WriteString(m.fi.View())
 	}
 	// Do not apply Width()+Render() to the whole view — it reflows ANSI-rich
@@ -48,14 +46,32 @@ func renderView(m *Model) string {
 	return b.String()
 }
 
+func renderHelpLine(m *Model) string {
+	st := m.styles
+	dim := st.Inactive
+	join := dim.Render(" ")
+	chunks := []string{
+		m.paletteBold(0).Render("[t]") + dim.Render(" range"),
+		m.paletteBold(1).Render("[r]") + dim.Render(" refresh"),
+		m.paletteBold(2).Render("[p]") + dim.Render(" pause"),
+		m.paletteBold(3).Render("[u]") + dim.Render(" user chart"),
+		m.paletteBold(4).Render("[1-3]") + dim.Render(" panes"),
+		m.paletteBold(5).Render("[d]") + dim.Render(" detail"),
+		m.paletteBold(6).Render("[Tab]") + dim.Render(" focus"),
+		m.paletteBold(7).Render("[/]") + dim.Render(" filter"),
+		m.paletteBold(5).Render("[q]") + dim.Render(" quit"),
+	}
+	return strings.Join(chunks, join)
+}
+
 func renderStatusBar(m *Model) string {
 	st := m.styles
 	fp := currentFocus(m)
-	focusStr := st.Hi.Render("▶" + focusPaneLabel(fp) + " ")
+	focusStr := lipgloss.NewStyle().Bold(true).Foreground(m.paletteAt(4)).Render("▶"+focusPaneLabel(fp)+" ")
 
 	stale := ""
 	if m.snapshot != nil && m.snapshot.Stale {
-		stale = st.Hi.Render("cached") + st.Inactive.Render(" · ")
+		stale = lipgloss.NewStyle().Foreground(m.paletteAt(5)).Render("cached") + st.Inactive.Render(" · ")
 	}
 
 	status := "idle"
@@ -68,7 +84,7 @@ func renderStatusBar(m *Model) string {
 	if m.offline {
 		status += "·off"
 	}
-	statusStr := st.Inactive.Render(status)
+	statusStr := lipgloss.NewStyle().Foreground(m.paletteAt(6)).Render(status)
 
 	nr := ""
 	if !m.nextRefresh.IsZero() && !m.paused && !m.offline {
@@ -76,36 +92,47 @@ func renderStatusBar(m *Model) string {
 		if d < 0 {
 			d = 0
 		}
-		nr = st.Inactive.Render(fmt.Sprintf(" · r:%ds", int(d.Seconds())))
+		nr = st.Inactive.Render(" · ") + lipgloss.NewStyle().Foreground(m.paletteAt(7)).Render(fmt.Sprintf("r:%ds", int(d.Seconds())))
 	}
 
-	repo := fmt.Sprintf(" · repos:%d", len(m.projects))
+	dot := st.Inactive.Render(" · ")
+	repoLbl := st.Inactive.Render("repos:")
+	repoVal := lipgloss.NewStyle().Foreground(m.paletteAt(1))
+	repoPart := dot + repoLbl + repoVal.Render(fmt.Sprintf("%d", len(m.projects)))
 	if m.resolveErr != nil {
-		repo = " · repos:err"
+		repoPart = dot + lipgloss.NewStyle().Foreground(m.paletteAt(3)).Render("repos:err")
 	}
-	periodStats := ""
+
+	var periodPart string
 	if m.snapshot != nil {
 		co := m.snapshot.Counts
-		periodStats = fmt.Sprintf(
-			" · users:%d · c/m/i:%d/%d/%d · closed:%d · open:%d",
-			co.DistinctUsers, co.Commits, co.Merges, co.ClosedIssues, co.ClosedIssues, co.OpenIssues,
-		)
+		usersVal := lipgloss.NewStyle().Foreground(m.paletteAt(3)).Render(fmt.Sprintf("%d", co.DistinctUsers))
+		cV := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 0)).Render(strconv.Itoa(co.Commits))
+		mV := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 1)).Render(strconv.Itoa(co.Merges))
+		iV := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 2)).Render(strconv.Itoa(co.ClosedIssues))
+		clV := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 2)).Render(strconv.Itoa(co.ClosedIssues))
+		opV := lipgloss.NewStyle().Foreground(m.paletteAt(2)).Render(strconv.Itoa(co.OpenIssues))
+		periodPart = dot + st.Inactive.Render("users:") + usersVal +
+			dot + st.Inactive.Render("c/m/i:") + cV + st.Inactive.Render("/") + mV + st.Inactive.Render("/") + iV +
+			dot + st.Inactive.Render("closed:") + clV +
+			dot + st.Inactive.Render("open:") + opV
 	}
-	repoStr := st.Inactive.Render(repo + periodStats)
 
-	rng := st.Inactive.Render(m.tr.String())
+	title := m.paletteBold(0).Render("glabtop")
+	rng := lipgloss.NewStyle().Bold(true).Foreground(m.paletteAt(2)).Render(m.tr.String())
 
 	leftCore := lipgloss.JoinHorizontal(lipgloss.Left,
-		st.Title.Render("glabtop"),
+		title,
 		st.Inactive.Render(" · "),
 		stale,
 		rng,
-		st.Inactive.Render(" · "),
+		dot,
 		focusStr,
 		st.Inactive.Render(" · "),
 		statusStr,
 		nr,
-		repoStr,
+		repoPart,
+		periodPart,
 	)
 
 	errMsg := ""
@@ -142,7 +169,7 @@ func max(a, b int) int {
 
 func paneBorder(m *Model, focused bool) lipgloss.Style {
 	st := m.styles
-	fgHi := lipgloss.Color(m.theme.Hex("hi_fg", "#89B4FA"))
+	fgHi := m.paletteAt(3)
 	fgDim := lipgloss.Color(m.theme.Hex("div_line", "#6C7086"))
 	s := st.BorderStyle.Border(st.Border)
 	if focused {
@@ -164,15 +191,21 @@ func statsBlock(m *Model, w int) string {
 	st := m.styles
 	box := paneBorder(m, activityPaneFocused(m)).Width(borderContentWidth(w)).Padding(0, 0)
 	if m.snapshot == nil {
-		return box.Render(st.Title.Render(" Activity ") + "\n" + st.Inactive.Render("no data"))
+		h := m.paletteBold(1).Render(" Activity ")
+		return box.Render(h + "\n" + st.Inactive.Render("no data"))
 	}
 	if len(m.snapshot.Series) == 0 {
-		line := fmt.Sprintf("totals: %d commits · %d merges · %d issues — %s",
-			m.snapshot.Counts.Commits, m.snapshot.Counts.Merges, m.snapshot.Counts.ClosedIssues,
-			"use [r] to refresh or wait for sync")
-		return box.Render(st.Title.Render(" Activity ") + "\n" + st.Inactive.Render(line))
+		co := m.snapshot.Counts
+		cN := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 0)).Render(strconv.Itoa(co.Commits))
+		mN := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 1)).Render(strconv.Itoa(co.Merges))
+		iN := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 2)).Render(strconv.Itoa(co.ClosedIssues))
+		line := st.Inactive.Render("totals: ") + cN + st.Inactive.Render(" commits · ") +
+			mN + st.Inactive.Render(" merges · ") + iN + st.Inactive.Render(" issues — ") +
+			st.Inactive.Render("use ") + m.paletteBold(4).Render("[r]") + st.Inactive.Render(" to refresh or wait for sync")
+		h := m.paletteBold(0).Render(" Activity ")
+		return box.Render(h + "\n" + line)
 	}
-	title := st.Title.Render(" Activity — time →  ")
+	title := m.paletteBold(0).Render(" Activity ") + lipgloss.NewStyle().Foreground(m.paletteAt(5)).Render("— time →  ")
 	canUC := m.snapshot.UserChart != nil && len(m.snapshot.UserChart.Users) > 0
 	useUser := m.chartByUser && canUC
 	note := ""
@@ -180,7 +213,7 @@ func statsBlock(m *Model, w int) string {
 		note = st.Inactive.Render("by-user breakdown unavailable — showing by type") + "\n"
 	}
 	if useUser {
-		title = st.Title.Render(" Activity (by user) — time →  ")
+		title = m.paletteBold(0).Render(" Activity (by user) ") + lipgloss.NewStyle().Foreground(m.paletteAt(5)).Render("— time →  ")
 	}
 	innerChartW := borderContentWidth(w)
 	if innerChartW < 4 {
@@ -202,8 +235,8 @@ func typeChartLegend(m *Model) string {
 	c := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 0)).Render("██")
 	cm := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 1)).Render("██")
 	ci := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 2)).Render("██")
-	return st.Inactive.Render("stack ") + c + st.Inactive.Render(" c ") +
-		cm + st.Inactive.Render(" m ") + ci + st.Inactive.Render(" i")
+	return st.Inactive.Render("stack ") + c + lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 0)).Render(" c ") +
+		cm + lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 1)).Render(" m ") + ci + lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 2)).Render(" i")
 }
 
 func columnWidths(n, total int) []int {
@@ -279,7 +312,7 @@ func stackedTimeSeriesChart(m *Model, width, height int) string {
 	var rows []string
 	for row := 0; row < height; row++ {
 		var line strings.Builder
-		line.WriteString(yAxisPrefix(row, height, maxTotal, axisBodyW, axisW, st.Inactive))
+		line.WriteString(yAxisPrefix(m, row, height, maxTotal, axisBodyW, axisW, st.Inactive))
 		fromBottom := height - 1 - row
 		for j, b := range v {
 			colW := colWidths[j]
@@ -322,7 +355,7 @@ func stackedTimeSeriesChart(m *Model, width, height int) string {
 			continue
 		}
 		lbl := bucketAxisLabel(m.tr, b.StartRFC3339, cw)
-		axis.WriteString(st.Inactive.Render(lbl))
+		axis.WriteString(lipgloss.NewStyle().Foreground(m.paletteAt(6+j%8)).Render(lbl))
 	}
 	rows = append(rows, axis.String())
 
@@ -355,7 +388,7 @@ func stackedUserChart(m *Model, width, height int) string {
 	var rows []string
 	for row := 0; row < height; row++ {
 		var line strings.Builder
-		line.WriteString(yAxisPrefix(row, height, maxTotal, axisBodyW, axisW, st.Inactive))
+		line.WriteString(yAxisPrefix(m, row, height, maxTotal, axisBodyW, axisW, st.Inactive))
 		fromBottom := height - 1 - row
 		for j, b := range v {
 			colW := colWidths[j]
@@ -399,7 +432,7 @@ func stackedUserChart(m *Model, width, height int) string {
 			continue
 		}
 		lbl := bucketAxisLabel(m.tr, b.StartRFC3339, cw)
-		axis.WriteString(st.Inactive.Render(lbl))
+		axis.WriteString(lipgloss.NewStyle().Foreground(m.paletteAt(6+j%8)).Render(lbl))
 	}
 	rows = append(rows, axis.String())
 
@@ -457,13 +490,14 @@ func userChartLegend(m *Model) string {
 			name = string(runes[:11]) + "…"
 		}
 		sq := lipgloss.NewStyle().Foreground(chartUserColor(m, i)).Render("██")
-		parts = append(parts, sq+st.Inactive.Render(" "+name))
+		parts = append(parts, sq+lipgloss.NewStyle().Foreground(m.paletteAt((i+3)%8)).Render(" "+name))
 	}
 	return strings.Join(parts, sep)
 }
 
-// yAxisPrefix returns a fixed-width left gutter for one chart row (scale labels).
-func yAxisPrefix(row, height, maxTotal, axisBodyW, axisW int, inactive lipgloss.Style) string {
+// yAxisPrefix returns a fillWidth left gutter for one chart row (scale labels).
+func yAxisPrefix(m *Model, row, height, maxTotal, axisBodyW, axisW int, inactive lipgloss.Style) string {
+	numStyle := lipgloss.NewStyle().Foreground(m.paletteAt(5))
 	midRow := height / 2
 	var val string
 	switch {
@@ -472,15 +506,16 @@ func yAxisPrefix(row, height, maxTotal, axisBodyW, axisW int, inactive lipgloss.
 	case row == height-1:
 		val = "0"
 	case height > 5 && row == midRow && maxTotal > 1:
-		m := maxTotal / 2
-		if m <= 0 || m >= maxTotal {
-			return strings.Repeat(" ", axisW)
+		mid := maxTotal / 2
+		if mid <= 0 || mid >= maxTotal {
+			return inactive.Render(strings.Repeat(" ", axisW))
 		}
-		val = strconv.Itoa(m)
+		val = strconv.Itoa(mid)
 	default:
-		return strings.Repeat(" ", axisW)
+		return inactive.Render(strings.Repeat(" ", axisW))
 	}
-	return inactive.Render(fmt.Sprintf("%*s ", axisBodyW, val))
+	padded := fmt.Sprintf("%*s ", axisBodyW, val)
+	return numStyle.Render(strings.TrimRight(padded, " ")) + inactive.Render(" ")
 }
 
 func splitStack(colH, c, m, i, tot int) (hC, hM, hI int) {

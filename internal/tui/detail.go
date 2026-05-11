@@ -9,7 +9,6 @@ import (
 	"github.com/mattn/go-runewidth"
 
 	"glabtop/internal/model"
-	th "glabtop/internal/theme"
 )
 
 func detailSplitOuter(m *Model) (leftOut, rightOut int) {
@@ -40,21 +39,23 @@ func selectedIssueRow(m *Model) (model.IssueRow, bool) {
 	if !ok {
 		return model.IssueRow{}, false
 	}
-	return ii.i, true
+	return ii.iss, true
 }
 
-// detailSectionHeader renders a bold section label (theme title style).
-func detailSectionHeader(st th.Styles, label string) string {
-	return st.Title.Render(label)
+// detailSectionHeader renders a bold section label using the chart palette.
+func detailSectionHeader(m *Model, idx int, label string) string {
+	return m.paletteBold(idx % 8).Render(label)
 }
 
 func appendDetailSpacer(lines *[]string) {
 	*lines = append(*lines, "")
 }
 
-func appendDetailSection(lines *[]string, st th.Styles, header, body string, innerW int) {
+func appendDetailSection(lines *[]string, m *Model, sec int, header, body string, innerW int) {
+	st := m.styles
 	appendDetailSpacer(lines)
-	*lines = append(*lines, detailSectionHeader(st, header))
+	*lines = append(*lines, detailSectionHeader(m, sec, header))
+	valFg := m.paletteAt((sec + 3) % 8)
 	s := strings.TrimSpace(body)
 	if s == "" {
 		*lines = append(*lines, st.Inactive.Render("—"))
@@ -64,7 +65,7 @@ func appendDetailSection(lines *[]string, st th.Styles, header, body string, inn
 		if ln == "" {
 			*lines = append(*lines, "")
 		} else {
-			*lines = append(*lines, st.Base.Render(ln))
+			*lines = append(*lines, lipgloss.NewStyle().Foreground(valFg).Render(ln))
 		}
 	}
 }
@@ -158,15 +159,15 @@ func renderCommitDetail(m *Model, innerW, innerH int) string {
 	var lines []string
 	c, ok := selectedCommitRow(m)
 	if !ok {
-		lines = append(lines, detailSectionHeader(st, "Commit"))
+		lines = append(lines, detailSectionHeader(m, 0, "Commit"))
 		appendDetailSpacer(&lines)
 		lines = append(lines, st.Inactive.Render("no selection"))
 		return joinDetailLines(lines, innerH)
 	}
 
-	lines = append(lines, detailSectionHeader(st, "Commit"))
-	appendDetailSection(&lines, st, "SHA", c.ShortID+" · "+c.ID, innerW)
-	appendDetailSection(&lines, st, "Project", c.ProjectPath, innerW)
+	lines = append(lines, detailSectionHeader(m, 0, "Commit"))
+	appendDetailSection(&lines, m, 1, "SHA", c.ShortID+" · "+c.ID, innerW)
+	appendDetailSection(&lines, m, 2, "Project", c.ProjectPath, innerW)
 	auth := strings.TrimSpace(c.AuthorName)
 	if em := strings.TrimSpace(c.AuthorEmail); em != "" {
 		if auth != "" {
@@ -175,9 +176,9 @@ func renderCommitDetail(m *Model, innerW, innerH int) string {
 			auth = em
 		}
 	}
-	appendDetailSection(&lines, st, "Author", auth, innerW)
-	appendDetailSection(&lines, st, "Date (UTC)", c.CreatedAt.UTC().Format(time.RFC3339), innerW)
-	appendDetailSection(&lines, st, "Message", c.Title, innerW)
+	appendDetailSection(&lines, m, 3, "Author", auth, innerW)
+	appendDetailSection(&lines, m, 4, "Date (UTC)", c.CreatedAt.UTC().Format(time.RFC3339), innerW)
+	appendDetailSection(&lines, m, 5, "Message", c.Title, innerW)
 
 	return joinDetailLines(lines, innerH)
 }
@@ -187,15 +188,15 @@ func renderIssueDetail(m *Model, innerW, innerH int) string {
 	var lines []string
 	i, ok := selectedIssueRow(m)
 	if !ok {
-		lines = append(lines, detailSectionHeader(st, "Issue"))
+		lines = append(lines, detailSectionHeader(m, 0, "Issue"))
 		appendDetailSpacer(&lines)
 		lines = append(lines, st.Inactive.Render("no selection"))
 		return joinDetailLines(lines, innerH)
 	}
 
-	lines = append(lines, detailSectionHeader(st, "Issue"))
-	appendDetailSection(&lines, st, "Reference", fmt.Sprintf("#%d", i.IID), innerW)
-	appendDetailSection(&lines, st, "Project", i.ProjectPath, innerW)
+	lines = append(lines, detailSectionHeader(m, 0, "Issue"))
+	appendDetailSection(&lines, m, 1, "Reference", fmt.Sprintf("#%d", i.IID), innerW)
+	appendDetailSection(&lines, m, 2, "Project", i.ProjectPath, innerW)
 	people := strings.TrimSpace(i.AuthorName)
 	if a := strings.TrimSpace(i.AssigneeName); a != "" {
 		if people != "" {
@@ -204,12 +205,12 @@ func renderIssueDetail(m *Model, innerW, innerH int) string {
 			people = "→ " + a
 		}
 	}
-	appendDetailSection(&lines, st, "People", people, innerW)
-	appendDetailSection(&lines, st, "State", i.State, innerW)
-	appendDetailSection(&lines, st, "Closed (UTC)", i.ClosedAt.UTC().Format(time.RFC3339), innerW)
-	appendDetailSection(&lines, st, "Updated (UTC)", i.UpdatedAt.UTC().Format(time.RFC3339), innerW)
-	appendDetailSection(&lines, st, "Link", i.WebURL, innerW)
-	appendDetailSection(&lines, st, "Title", i.Title, innerW)
+	appendDetailSection(&lines, m, 3, "People", people, innerW)
+	appendDetailSection(&lines, m, 4, "State", i.State, innerW)
+	appendDetailSection(&lines, m, 5, "Closed (UTC)", i.ClosedAt.UTC().Format(time.RFC3339), innerW)
+	appendDetailSection(&lines, m, 6, "Updated (UTC)", i.UpdatedAt.UTC().Format(time.RFC3339), innerW)
+	appendDetailSection(&lines, m, 7, "Link", i.WebURL, innerW)
+	appendDetailSection(&lines, m, 1, "Title", i.Title, innerW)
 
 	return joinDetailLines(lines, innerH)
 }
@@ -217,6 +218,6 @@ func renderIssueDetail(m *Model, innerW, innerH int) string {
 func detailRightBorder(m *Model) lipgloss.Style {
 	st := m.styles
 	s := st.BorderStyle.Border(st.Border)
-	fg := lipgloss.Color(m.theme.Hex("div_line", "#6C7086"))
+	fg := m.paletteAt(7)
 	return s.BorderForeground(fg)
 }

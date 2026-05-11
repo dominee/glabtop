@@ -36,7 +36,7 @@ func TestCommitItem_strings(t *testing.T) {
 }
 
 func TestIssueItem_strings(t *testing.T) {
-	it := issueItem{i: model.IssueRow{
+	it := issueItem{iss: model.IssueRow{
 		IID:         7,
 		Title:       "bug",
 		AuthorName:  "a",
@@ -50,7 +50,7 @@ func TestIssueItem_strings(t *testing.T) {
 }
 
 func TestCommitItems_nilSnapshot(t *testing.T) {
-	if commitItems(nil) != nil || issueItems(nil) != nil {
+	if commitItems(nil, nil) != nil || issueItems(nil, nil) != nil {
 		t.Fatal()
 	}
 }
