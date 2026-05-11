@@ -497,14 +497,48 @@ func padTrim(s string, w int) string {
 }
 
 func listsBlock(m *Model, w int) string {
+	innerH := m.listViewportH
+	if innerH < 1 {
+		innerH = 6
+	}
 	if m.detailPane {
+		const gapW = 1
+		if m.showCommits && m.showIssues {
+			leftOut, rightOut := detailSplitOuter(m)
+			listOuter := leftOut
+			detailOuter := rightOut
+			detailInner := detailOuter - 2
+			if detailInner < 1 {
+				detailInner = 1
+			}
+			if m.listCommitActive {
+				left := paneBorder(m, commitsPaneFocused(m)).Width(listOuter).Render(m.commitList.View())
+				right := detailRightBorder(m).Width(detailOuter).Render(renderCommitDetail(m, detailInner, innerH))
+				return lipgloss.JoinHorizontal(lipgloss.Top, left, strings.Repeat(" ", gapW), right)
+			}
+			left := paneBorder(m, issuesPaneFocused(m)).Width(listOuter).Render(m.issueList.View())
+			right := detailRightBorder(m).Width(detailOuter).Render(renderIssueDetail(m, detailInner, innerH))
+			return lipgloss.JoinHorizontal(lipgloss.Top, left, strings.Repeat(" ", gapW), right)
+		}
 		if m.showCommits {
-			fr := paneBorder(m, commitsPaneFocused(m)).Width(w)
-			return fr.Render(m.commitList.View())
+			leftOut, rightOut := detailSplitOuter(m)
+			detailInner := rightOut - 2
+			if detailInner < 1 {
+				detailInner = 1
+			}
+			left := paneBorder(m, commitsPaneFocused(m)).Width(leftOut).Render(m.commitList.View())
+			right := detailRightBorder(m).Width(rightOut).Render(renderCommitDetail(m, detailInner, innerH))
+			return lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right)
 		}
 		if m.showIssues {
-			fr := paneBorder(m, issuesPaneFocused(m)).Width(w)
-			return fr.Render(m.issueList.View())
+			leftOut, rightOut := detailSplitOuter(m)
+			detailInner := rightOut - 2
+			if detailInner < 1 {
+				detailInner = 1
+			}
+			left := paneBorder(m, issuesPaneFocused(m)).Width(leftOut).Render(m.issueList.View())
+			right := detailRightBorder(m).Width(rightOut).Render(renderIssueDetail(m, detailInner, innerH))
+			return lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right)
 		}
 	}
 	if m.showCommits && m.showIssues {

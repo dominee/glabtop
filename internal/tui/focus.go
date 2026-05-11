@@ -15,6 +15,12 @@ func currentFocus(m *Model) focusPane {
 		return focusFilter
 	}
 	if m.detailPane {
+		if m.showCommits && m.showIssues {
+			if m.listCommitActive {
+				return focusCommits
+			}
+			return focusIssues
+		}
 		if m.showCommits {
 			return focusCommits
 		}

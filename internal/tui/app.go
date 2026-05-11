@@ -58,6 +58,7 @@ type Model struct {
 	showIssues       bool
 	detailPane       bool
 	listCommitActive bool
+	listViewportH    int
 	chartByUser      bool
 
 	projectFilter string
@@ -381,6 +382,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case "tab":
 			m.listCommitActive = !m.listCommitActive
+			m.layoutLists()
 			return m, nil
 		case "/":
 			m.filterFocus = true
@@ -415,7 +417,10 @@ func routeToCommits(m *Model, _ tea.KeyMsg) bool {
 		return false
 	}
 	if m.detailPane {
-		return true
+		if !m.showIssues {
+			return true
+		}
+		return m.listCommitActive
 	}
 	if m.showIssues {
 		return m.listCommitActive
@@ -459,16 +464,36 @@ func (m *Model) layoutLists() {
 
 	var commitInnerW, issueInnerW int
 	switch {
-	case m.detailPane:
-		full := m.w - 2
-		if full < 1 {
-			full = 1
+	case m.detailPane && m.showCommits && m.showIssues:
+		leftOut := (m.w - gapW) / 2
+		listInner := leftOut - 2
+		if listInner < 1 {
+			listInner = 1
 		}
-		if m.showCommits {
-			commitInnerW = full
+		if m.listCommitActive {
+			commitInnerW = listInner
+			issueInnerW = 1
+		} else {
+			issueInnerW = listInner
+			commitInnerW = 1
+		}
+	case m.detailPane && m.showCommits:
+		leftOut := (m.w - gapW) / 2
+		commitInnerW = leftOut - 2
+		if commitInnerW < 1 {
+			commitInnerW = 1
 		}
 		if m.showIssues {
-			issueInnerW = full
+			issueInnerW = 1
+		}
+	case m.detailPane && m.showIssues:
+		leftOut := (m.w - gapW) / 2
+		issueInnerW = leftOut - 2
+		if issueInnerW < 1 {
+			issueInnerW = 1
+		}
+		if m.showCommits {
+			commitInnerW = 1
 		}
 	case m.showCommits && m.showIssues:
 		leftOut := (m.w - gapW) / 2
@@ -500,6 +525,7 @@ func (m *Model) layoutLists() {
 	if m.showIssues {
 		m.issueList.SetSize(issueInnerW, listH)
 	}
+	m.listViewportH = listH
 }
 
 // View implements tea.Model.
