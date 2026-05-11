@@ -191,9 +191,9 @@ func statsBlock(m *Model, w int) string {
 
 func typeChartLegend(m *Model) string {
 	st := m.styles
-	c := lipgloss.NewStyle().Foreground(st.MeterLow).Render("██")
-	cm := lipgloss.NewStyle().Foreground(st.MeterMid).Render("██")
-	ci := lipgloss.NewStyle().Foreground(st.MeterHigh).Render("██")
+	c := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 0)).Render("██")
+	cm := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 1)).Render("██")
+	ci := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 2)).Render("██")
 	return st.Inactive.Render("stack ") + c + st.Inactive.Render(" c ") +
 		cm + st.Inactive.Render(" m ") + ci + st.Inactive.Render(" i")
 }
@@ -216,6 +216,28 @@ func columnWidths(n, total int) []int {
 		}
 	}
 	return w
+}
+
+// chartUserColor uses theme-derived, Lab-spaced palette entries.
+func chartUserColor(m *Model, i int) lipgloss.Color {
+	p := m.theme.ChartPalette(8)
+	if len(p) == 0 {
+		return lipgloss.Color(m.theme.Hex("hi_fg", "#89B4FA"))
+	}
+	return p[i%len(p)]
+}
+
+// typeChartSegmentColor maps commits / merges / issues to spread indices in the theme palette.
+func typeChartSegmentColor(m *Model, seg int) lipgloss.Color {
+	p := m.theme.ChartPalette(8)
+	if len(p) == 0 {
+		return lipgloss.Color(m.theme.Hex("hi_fg", "#89B4FA"))
+	}
+	ix := []int{0, 3, 6}
+	if seg >= 0 && seg < len(ix) {
+		return p[ix[seg]%len(p)]
+	}
+	return p[seg%len(p)]
 }
 
 func stackedTimeSeriesChart(m *Model, width, height int) string {
@@ -241,9 +263,9 @@ func stackedTimeSeriesChart(m *Model, width, height int) string {
 		plotW = 1
 	}
 	colWidths := columnWidths(len(v), plotW)
-	commitStyle := lipgloss.NewStyle().Foreground(st.MeterLow)
-	mergeStyle := lipgloss.NewStyle().Foreground(st.MeterMid)
-	issueStyle := lipgloss.NewStyle().Foreground(st.MeterHigh)
+	commitStyle := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 0))
+	mergeStyle := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 1))
+	issueStyle := lipgloss.NewStyle().Foreground(typeChartSegmentColor(m, 2))
 	rulerCh := lipgloss.NewStyle().Foreground(lipgloss.Color(m.theme.Hex("div_line", "#6C7086"))).Render("─")
 
 	var rows []string
@@ -410,12 +432,6 @@ func userSegmentAt(fromBottom int, heights []int) int {
 		acc = next
 	}
 	return -1
-}
-
-func chartUserColor(m *Model, i int) lipgloss.Color {
-	keys := []string{"cpu_start", "mem_start", "net_download", "proc", "gpu_start", "cpu_end", "mem_end", "net_upload"}
-	k := keys[i%len(keys)]
-	return lipgloss.Color(m.theme.Hex(k, "#89B4FA"))
 }
 
 func userChartLegend(m *Model) string {
