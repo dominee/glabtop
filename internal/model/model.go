@@ -118,19 +118,19 @@ type CommitRow struct {
 	AuthorName  string    `json:"author_name"`
 	AuthorEmail string    `json:"author_email"`
 	CreatedAt   time.Time `json:"created_at"`
-	ProjectPath string    `json:"-"`
+	ProjectPath string    `json:"project_path,omitempty"`
 }
 
 type IssueRow struct {
 	IID          int       `json:"iid"`
 	Title        string    `json:"title"`
 	State        string    `json:"state"`
-	AuthorName   string    `json:"-"`
-	AssigneeName string    `json:"-"`
+	AuthorName   string    `json:"author_name,omitempty"`
+	AssigneeName string    `json:"assignee_name,omitempty"`
 	ClosedAt     time.Time `json:"closed_at"`
 	UpdatedAt    time.Time `json:"updated_at"`
 	WebURL       string    `json:"web_url"`
-	ProjectPath  string    `json:"-"`
+	ProjectPath  string    `json:"project_path,omitempty"`
 }
 
 type Counts struct {

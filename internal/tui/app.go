@@ -3,6 +3,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -160,9 +161,69 @@ func scheduleRefresh(d time.Duration) tea.Cmd {
 	return tea.Tick(d, func(time.Time) tea.Msg { return refreshPulseMsg{} })
 }
 
+func normalizeGitLabHost(h string) string {
+	h = strings.TrimSpace(strings.TrimRight(h, "/"))
+	if h == "" {
+		return ""
+	}
+	u, err := url.Parse(h)
+	if err != nil || u.Host == "" {
+		h = strings.TrimPrefix(h, "https://")
+		h = strings.TrimPrefix(h, "http://")
+		return strings.ToLower(strings.TrimSuffix(h, "/"))
+	}
+	return strings.ToLower(u.Scheme + "://" + u.Host)
+}
+
+func hostsMatch(cachedHost, cfgHost string) bool {
+	c := normalizeGitLabHost(cachedHost)
+	d := normalizeGitLabHost(cfgHost)
+	if c == "" || d == "" {
+		return true
+	}
+	return c == d
+}
+
+// projectRefsFromSnapshot builds project refs from row metadata (for offline when targets cache is empty).
+func projectRefsFromSnapshot(snap *model.Snapshot) []model.ProjectRef {
+	if snap == nil {
+		return nil
+	}
+	seen := make(map[string]struct{})
+	var out []model.ProjectRef
+	add := func(p string) {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			return
+		}
+		if _, ok := seen[p]; ok {
+			return
+		}
+		seen[p] = struct{}{}
+		out = append(out, model.ProjectRef{PathWithNamespace: p})
+	}
+	for _, c := range snap.Commits {
+		add(c.ProjectPath)
+	}
+	for _, iss := range snap.Issues {
+		add(iss.ProjectPath)
+	}
+	return out
+}
+
 func resolveProjectsCmd(m *Model) tea.Cmd {
 	if m.offline {
 		return func() tea.Msg {
+			cfgHost := strings.TrimSpace(strings.TrimRight(m.cfg.GitLab.Host, "/"))
+			if m.store != nil {
+				h, refs, _, err := m.store.GetResolvedTargets()
+				if err == nil && len(refs) > 0 && hostsMatch(h, cfgHost) {
+					return resolveDoneMsg{projects: refs, err: nil}
+				}
+			}
+			if refs := projectRefsFromSnapshot(m.snapshot); len(refs) > 0 {
+				return resolveDoneMsg{projects: refs, err: nil}
+			}
 			var refs []model.ProjectRef
 			for _, p := range m.cfg.Targets.Projects {
 				refs = append(refs, model.ProjectRef{PathWithNamespace: p})
@@ -298,6 +359,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case resolveDoneMsg:
 		m.resolveErr = msg.err
 		m.projects = msg.projects
+		if m.resolveErr == nil && len(m.projects) > 0 && m.store != nil && !m.offline {
+			_ = m.store.PutResolvedTargets(m.cfg.GitLab.Host, m.projects)
+		}
 		if m.resolveErr == nil && len(m.projects) > 0 && !m.offline {
 			m.fetchGen++
 			m.loading = true

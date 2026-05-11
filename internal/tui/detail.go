@@ -9,6 +9,7 @@ import (
 	"github.com/mattn/go-runewidth"
 
 	"glabtop/internal/model"
+	th "glabtop/internal/theme"
 )
 
 func detailSplitOuter(m *Model) (leftOut, rightOut int) {
@@ -42,34 +43,30 @@ func selectedIssueRow(m *Model) (model.IssueRow, bool) {
 	return ii.i, true
 }
 
-func commitDetailString(c model.CommitRow) string {
-	return fmt.Sprintf(
-		"SHA\n%s\n\nProject\n%s\n\nAuthor\n%s\n%s\n\nDate (UTC)\n%s\n\nMessage\n%s",
-		c.ID,
-		c.ProjectPath,
-		c.AuthorName,
-		c.AuthorEmail,
-		c.CreatedAt.UTC().Format(time.RFC3339),
-		c.Title,
-	)
+// detailSectionHeader renders a bold section label (theme title style).
+func detailSectionHeader(st th.Styles, label string) string {
+	return st.Title.Render(label)
 }
 
-func issueDetailString(i model.IssueRow) string {
-	people := i.AuthorName
-	if strings.TrimSpace(i.AssigneeName) != "" {
-		people += " → " + i.AssigneeName
+func appendDetailSpacer(lines *[]string) {
+	*lines = append(*lines, "")
+}
+
+func appendDetailSection(lines *[]string, st th.Styles, header, body string, innerW int) {
+	appendDetailSpacer(lines)
+	*lines = append(*lines, detailSectionHeader(st, header))
+	s := strings.TrimSpace(body)
+	if s == "" {
+		*lines = append(*lines, st.Inactive.Render("—"))
+		return
 	}
-	return fmt.Sprintf(
-		"Issue #%d\n\nProject\n%s\n\nPeople\n%s\n\nState\n%s\n\nClosed (UTC)\n%s\n\nUpdated (UTC)\n%s\n\nURL\n%s\n\nTitle\n%s",
-		i.IID,
-		i.ProjectPath,
-		people,
-		i.State,
-		i.ClosedAt.UTC().Format(time.RFC3339),
-		i.UpdatedAt.UTC().Format(time.RFC3339),
-		i.WebURL,
-		i.Title,
-	)
+	for _, ln := range wrapToWidthPlain(s, innerW) {
+		if ln == "" {
+			*lines = append(*lines, "")
+		} else {
+			*lines = append(*lines, st.Base.Render(ln))
+		}
+	}
 }
 
 func hardBreakRune(s string, width int) []string {
@@ -161,18 +158,27 @@ func renderCommitDetail(m *Model, innerW, innerH int) string {
 	var lines []string
 	c, ok := selectedCommitRow(m)
 	if !ok {
-		lines = append(lines, st.Title.Render(" Commit "))
+		lines = append(lines, detailSectionHeader(st, "Commit"))
+		appendDetailSpacer(&lines)
 		lines = append(lines, st.Inactive.Render("no selection"))
 		return joinDetailLines(lines, innerH)
 	}
-	lines = append(lines, st.Title.Render(" Commit "))
-	for _, ln := range wrapToWidthPlain(commitDetailString(c), innerW) {
-		if ln == "" {
-			lines = append(lines, "")
+
+	lines = append(lines, detailSectionHeader(st, "Commit"))
+	appendDetailSection(&lines, st, "SHA", c.ShortID+" · "+c.ID, innerW)
+	appendDetailSection(&lines, st, "Project", c.ProjectPath, innerW)
+	auth := strings.TrimSpace(c.AuthorName)
+	if em := strings.TrimSpace(c.AuthorEmail); em != "" {
+		if auth != "" {
+			auth = auth + "\n" + em
 		} else {
-			lines = append(lines, st.Base.Render(ln))
+			auth = em
 		}
 	}
+	appendDetailSection(&lines, st, "Author", auth, innerW)
+	appendDetailSection(&lines, st, "Date (UTC)", c.CreatedAt.UTC().Format(time.RFC3339), innerW)
+	appendDetailSection(&lines, st, "Message", c.Title, innerW)
+
 	return joinDetailLines(lines, innerH)
 }
 
@@ -181,18 +187,30 @@ func renderIssueDetail(m *Model, innerW, innerH int) string {
 	var lines []string
 	i, ok := selectedIssueRow(m)
 	if !ok {
-		lines = append(lines, st.Title.Render(" Issue "))
+		lines = append(lines, detailSectionHeader(st, "Issue"))
+		appendDetailSpacer(&lines)
 		lines = append(lines, st.Inactive.Render("no selection"))
 		return joinDetailLines(lines, innerH)
 	}
-	lines = append(lines, st.Title.Render(" Issue "))
-	for _, ln := range wrapToWidthPlain(issueDetailString(i), innerW) {
-		if ln == "" {
-			lines = append(lines, "")
+
+	lines = append(lines, detailSectionHeader(st, "Issue"))
+	appendDetailSection(&lines, st, "Reference", fmt.Sprintf("#%d", i.IID), innerW)
+	appendDetailSection(&lines, st, "Project", i.ProjectPath, innerW)
+	people := strings.TrimSpace(i.AuthorName)
+	if a := strings.TrimSpace(i.AssigneeName); a != "" {
+		if people != "" {
+			people = fmt.Sprintf("%s\n→ %s", people, a)
 		} else {
-			lines = append(lines, st.Base.Render(ln))
+			people = "→ " + a
 		}
 	}
+	appendDetailSection(&lines, st, "People", people, innerW)
+	appendDetailSection(&lines, st, "State", i.State, innerW)
+	appendDetailSection(&lines, st, "Closed (UTC)", i.ClosedAt.UTC().Format(time.RFC3339), innerW)
+	appendDetailSection(&lines, st, "Updated (UTC)", i.UpdatedAt.UTC().Format(time.RFC3339), innerW)
+	appendDetailSection(&lines, st, "Link", i.WebURL, innerW)
+	appendDetailSection(&lines, st, "Title", i.Title, innerW)
+
 	return joinDetailLines(lines, innerH)
 }
 

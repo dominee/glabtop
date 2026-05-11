@@ -127,7 +127,11 @@ func (s *Store) GetLastFetch(projectPath string) (int64, error) {
 // Purge removes snapshots, timeline, and meta.
 func (s *Store) Purge() error {
 	var firstErr error
-	for _, q := range []string{`DELETE FROM snapshots`, `DELETE FROM timeline`, `DELETE FROM meta`} {
+	for _, q := range []string{
+		`DELETE FROM snapshots`,
+		`DELETE FROM timeline`,
+		`DELETE FROM meta`,
+	} {
 		if _, err := s.db.Exec(q); err != nil && firstErr == nil {
 			firstErr = err
 		}
@@ -176,7 +180,6 @@ func (s *Store) LoadSeries(tr model.TimeRange, since, until time.Time) ([]model.
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 	defer rows.Close()
 	commits := make(map[int64]int)
 	merges := make(map[int64]int)
