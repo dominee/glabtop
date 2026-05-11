@@ -134,9 +134,11 @@ type IssueRow struct {
 }
 
 type Counts struct {
-	Commits      int
-	Merges       int
-	ClosedIssues int
+	Commits       int `json:"commits"`
+	Merges        int `json:"merges"`
+	ClosedIssues  int `json:"closed_issues"`
+	OpenIssues    int `json:"open_issues"`
+	DistinctUsers int `json:"distinct_users"`
 }
 
 type Snapshot struct {

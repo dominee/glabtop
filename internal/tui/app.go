@@ -303,7 +303,11 @@ func (m *Model) enrichSeriesFromDB() {
 		return
 	}
 	m.snapshot.Series = series
+	prevOpen := m.snapshot.Counts.OpenIssues
+	prevUsers := m.snapshot.Counts.DistinctUsers
 	m.snapshot.Counts = model.NormalizeSeries(series)
+	m.snapshot.Counts.OpenIssues = prevOpen
+	m.snapshot.Counts.DistinctUsers = prevUsers
 	m.snapshot.UserChart = nil
 }
 

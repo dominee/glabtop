@@ -253,13 +253,14 @@ func (c *Client) FetchSnapshot(ctx context.Context, projects []model.ProjectRef,
 
 	globalAgg := newBucketAgg()
 	var (
-		allCommits []model.CommitRow
-		allIssues  []model.IssueRow
-		mu         sync.Mutex
-		wg         sync.WaitGroup
-		sem        = make(chan struct{}, 5)
-		firstErr   error
-		errMu      sync.Mutex
+		allCommits      []model.CommitRow
+		allIssues       []model.IssueRow
+		openIssueCount  int
+		mu              sync.Mutex
+		wg              sync.WaitGroup
+		sem             = make(chan struct{}, 5)
+		firstErr        error
+		errMu           sync.Mutex
 	)
 
 	setErr := func(e error) {
@@ -327,9 +328,15 @@ func (c *Client) FetchSnapshot(ctx context.Context, projects []model.ProjectRef,
 				filteredIssues = append(filteredIssues, is)
 			}
 
+			nOpen, err := c.countOpenIssuesCreatedInWindow(ctx, p, sSince, sUntil, userMatch)
+			if err != nil {
+				setErr(fmt.Errorf("%s open issues: %w", p.PathWithNamespace, err))
+				return
+			}
 			mu.Lock()
 			allCommits = append(allCommits, filteredCommits...)
 			allIssues = append(allIssues, filteredIssues...)
+			openIssueCount += nOpen
 			mergeMaps(globalAgg, localAgg)
 			mu.Unlock()
 		}()
@@ -350,6 +357,9 @@ func (c *Client) FetchSnapshot(ctx context.Context, projects []model.ProjectRef,
 	model.SortIssuesByTimeDesc(allIssues)
 	trimSortCommits(&allCommits)
 	trimSortIssues(&allIssues)
+
+	counts.OpenIssues = openIssueCount
+	counts.DistinctUsers = model.DistinctUserCount(userBuckets)
 
 	snap := &model.Snapshot{
 		WindowID:     winID,
@@ -589,4 +599,69 @@ func (c *Client) fetchClosedIssues(ctx context.Context, p model.ProjectRef, sinc
 		page++
 	}
 	return out, nil
+}
+
+// countOpenIssuesCreatedInWindow counts issues still opened whose created_at falls in [since, until],
+// matching the same author/assignee filter as other lists.
+func (c *Client) countOpenIssuesCreatedInWindow(ctx context.Context, p model.ProjectRef, since, until string, userMatch func(string) bool) (int, error) {
+	sinceT, err := time.Parse(time.RFC3339, since)
+	if err != nil {
+		return 0, err
+	}
+	untilT, err := time.Parse(time.RFC3339, until)
+	if err != nil {
+		return 0, err
+	}
+	enc := strconv.Itoa(p.ID)
+	n := 0
+	page := 1
+	for page <= maxTimelinePages {
+		q := url.Values{}
+		q.Set("state", "opened")
+		q.Set("created_after", since)
+		q.Set("created_before", until)
+		q.Set("per_page", strconv.Itoa(c.perPage))
+		q.Set("page", strconv.Itoa(page))
+		q.Set("order_by", "created_at")
+		q.Set("sort", "desc")
+		b, err := c.get(ctx, "/projects/"+enc+"/issues", q)
+		if err != nil {
+			return n, err
+		}
+		var chunk []struct {
+			CreatedAt time.Time `json:"created_at"`
+			Author    struct {
+				Name string `json:"name"`
+			} `json:"author"`
+			Assignee *struct {
+				Name string `json:"name"`
+			} `json:"assignee"`
+		}
+		if err := json.Unmarshal(b, &chunk); err != nil {
+			return n, err
+		}
+		if len(chunk) == 0 {
+			break
+		}
+		for _, raw := range chunk {
+			cr := raw.CreatedAt.UTC()
+			if cr.Before(sinceT) || cr.After(untilT) {
+				continue
+			}
+			auth := raw.Author.Name
+			asg := ""
+			if raw.Assignee != nil {
+				asg = raw.Assignee.Name
+			}
+			if !userMatch(auth) && !userMatch(asg) {
+				continue
+			}
+			n++
+		}
+		if len(chunk) < c.perPage {
+			break
+		}
+		page++
+	}
+	return n, nil
 }

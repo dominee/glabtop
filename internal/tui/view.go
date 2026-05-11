@@ -79,11 +79,19 @@ func renderStatusBar(m *Model) string {
 		nr = st.Inactive.Render(fmt.Sprintf(" · r:%ds", int(d.Seconds())))
 	}
 
-	proj := fmt.Sprintf(" · p:%d", len(m.projects))
+	repo := fmt.Sprintf(" · repos:%d", len(m.projects))
 	if m.resolveErr != nil {
-		proj = " · p:err"
+		repo = " · repos:err"
 	}
-	projStr := st.Inactive.Render(proj)
+	periodStats := ""
+	if m.snapshot != nil {
+		co := m.snapshot.Counts
+		periodStats = fmt.Sprintf(
+			" · users:%d · c/m/i:%d/%d/%d · closed:%d · open:%d",
+			co.DistinctUsers, co.Commits, co.Merges, co.ClosedIssues, co.ClosedIssues, co.OpenIssues,
+		)
+	}
+	repoStr := st.Inactive.Render(repo + periodStats)
 
 	rng := st.Inactive.Render(m.tr.String())
 
@@ -97,7 +105,7 @@ func renderStatusBar(m *Model) string {
 		st.Inactive.Render(" · "),
 		statusStr,
 		nr,
-		projStr,
+		repoStr,
 	)
 
 	errMsg := ""

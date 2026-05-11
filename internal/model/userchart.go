@@ -149,3 +149,20 @@ func BuildUserChartFromAgg(since, until time.Time, tr TimeRange, perBucket map[i
 		MaxTotal: maxTot,
 	}
 }
+
+// DistinctUserCount is how many unique contributor labels appear in the user-activity aggregate (c/m/i actors).
+func DistinctUserCount(perBucket map[int64]map[string]int) int {
+	if len(perBucket) == 0 {
+		return 0
+	}
+	seen := make(map[string]struct{})
+	for _, m := range perBucket {
+		for u := range m {
+			if u == "" {
+				continue
+			}
+			seen[u] = struct{}{}
+		}
+	}
+	return len(seen)
+}
