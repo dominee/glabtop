@@ -143,9 +143,18 @@ func paneBorder(m *Model, focused bool) lipgloss.Style {
 	return s.BorderForeground(fgDim)
 }
 
+// borderContentWidth is the lipgloss Width for a bordered block so that the
+// final string width (including left/right border runes) equals outer.
+func borderContentWidth(outer int) int {
+	if outer < 2 {
+		return 1
+	}
+	return outer - 2
+}
+
 func statsBlock(m *Model, w int) string {
 	st := m.styles
-	box := paneBorder(m, activityPaneFocused(m)).Width(w).Padding(0, 0)
+	box := paneBorder(m, activityPaneFocused(m)).Width(borderContentWidth(w)).Padding(0, 0)
 	if m.snapshot == nil {
 		return box.Render(st.Title.Render(" Activity ") + "\n" + st.Inactive.Render("no data"))
 	}
@@ -165,7 +174,7 @@ func statsBlock(m *Model, w int) string {
 	if useUser {
 		title = st.Title.Render(" Activity (by user) — time →  ")
 	}
-	innerChartW := w - 2
+	innerChartW := borderContentWidth(w)
 	if innerChartW < 4 {
 		innerChartW = 4
 	}
@@ -512,12 +521,12 @@ func listsBlock(m *Model, w int) string {
 				detailInner = 1
 			}
 			if m.listCommitActive {
-				left := paneBorder(m, commitsPaneFocused(m)).Width(listOuter).Render(m.commitList.View())
-				right := detailRightBorder(m).Width(detailOuter).Render(renderCommitDetail(m, detailInner, innerH))
+				left := paneBorder(m, commitsPaneFocused(m)).Width(borderContentWidth(listOuter)).Render(m.commitList.View())
+				right := detailRightBorder(m).Width(borderContentWidth(detailOuter)).Render(renderCommitDetail(m, detailInner, innerH))
 				return lipgloss.JoinHorizontal(lipgloss.Top, left, strings.Repeat(" ", gapW), right)
 			}
-			left := paneBorder(m, issuesPaneFocused(m)).Width(listOuter).Render(m.issueList.View())
-			right := detailRightBorder(m).Width(detailOuter).Render(renderIssueDetail(m, detailInner, innerH))
+			left := paneBorder(m, issuesPaneFocused(m)).Width(borderContentWidth(listOuter)).Render(m.issueList.View())
+			right := detailRightBorder(m).Width(borderContentWidth(detailOuter)).Render(renderIssueDetail(m, detailInner, innerH))
 			return lipgloss.JoinHorizontal(lipgloss.Top, left, strings.Repeat(" ", gapW), right)
 		}
 		if m.showCommits {
@@ -526,8 +535,8 @@ func listsBlock(m *Model, w int) string {
 			if detailInner < 1 {
 				detailInner = 1
 			}
-			left := paneBorder(m, commitsPaneFocused(m)).Width(leftOut).Render(m.commitList.View())
-			right := detailRightBorder(m).Width(rightOut).Render(renderCommitDetail(m, detailInner, innerH))
+			left := paneBorder(m, commitsPaneFocused(m)).Width(borderContentWidth(leftOut)).Render(m.commitList.View())
+			right := detailRightBorder(m).Width(borderContentWidth(rightOut)).Render(renderCommitDetail(m, detailInner, innerH))
 			return lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right)
 		}
 		if m.showIssues {
@@ -536,8 +545,8 @@ func listsBlock(m *Model, w int) string {
 			if detailInner < 1 {
 				detailInner = 1
 			}
-			left := paneBorder(m, issuesPaneFocused(m)).Width(leftOut).Render(m.issueList.View())
-			right := detailRightBorder(m).Width(rightOut).Render(renderIssueDetail(m, detailInner, innerH))
+			left := paneBorder(m, issuesPaneFocused(m)).Width(borderContentWidth(leftOut)).Render(m.issueList.View())
+			right := detailRightBorder(m).Width(borderContentWidth(rightOut)).Render(renderIssueDetail(m, detailInner, innerH))
 			return lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right)
 		}
 	}
@@ -545,16 +554,16 @@ func listsBlock(m *Model, w int) string {
 		const gapW = 1
 		leftOuter := (m.w - gapW) / 2
 		rightOuter := m.w - gapW - leftOuter
-		left := paneBorder(m, commitsPaneFocused(m)).Width(leftOuter).Render(m.commitList.View())
-		right := paneBorder(m, issuesPaneFocused(m)).Width(rightOuter).Render(m.issueList.View())
+		left := paneBorder(m, commitsPaneFocused(m)).Width(borderContentWidth(leftOuter)).Render(m.commitList.View())
+		right := paneBorder(m, issuesPaneFocused(m)).Width(borderContentWidth(rightOuter)).Render(m.issueList.View())
 		return lipgloss.JoinHorizontal(lipgloss.Top, left, " ", right)
 	}
 	if m.showCommits {
-		fr := paneBorder(m, commitsPaneFocused(m)).Width(w)
+		fr := paneBorder(m, commitsPaneFocused(m)).Width(borderContentWidth(w))
 		return fr.Render(m.commitList.View())
 	}
 	if m.showIssues {
-		fr := paneBorder(m, issuesPaneFocused(m)).Width(w)
+		fr := paneBorder(m, issuesPaneFocused(m)).Width(borderContentWidth(w))
 		return fr.Render(m.issueList.View())
 	}
 	return ""
