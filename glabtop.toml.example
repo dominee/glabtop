@@ -1,0 +1,20 @@
+# Example configuration — copy to ./glabtop.toml or ~/.config/glabtop/glabtop.toml
+
+[gitlab]
+host = "https://gitlab.example.com"
+# token_env = "GITLAB_API_KEY"
+
+[targets]
+groups = ["my-group"]
+projects = ["my-group/my-project"]
+
+[ui]
+theme = "catppuccin_mocha"
+refresh_interval_sec = 600
+
+[cache]
+# db_path defaults to ~/.cache/glabtop/cache.db
+
+[filters]
+# project_substring = "core/"
+# username = "alice"
