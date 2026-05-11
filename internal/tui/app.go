@@ -433,7 +433,7 @@ func (m *Model) layoutLists() {
 	if m.w == 0 {
 		return
 	}
-	headerRows := 4
+	headerRows := 2
 	statsH := 0
 	if m.showStats {
 		statsH = 14
@@ -446,25 +446,52 @@ func (m *Model) layoutLists() {
 	if remain < 6 {
 		remain = 6
 	}
-	w := m.w - 4
-	if m.detailPane {
+
+	const gapW = 1
+	listH := remain
+
+	var commitInnerW, issueInnerW int
+	switch {
+	case m.detailPane:
+		full := m.w - 2
+		if full < 1 {
+			full = 1
+		}
 		if m.showCommits {
-			m.commitList.SetSize(w, remain)
+			commitInnerW = full
 		}
 		if m.showIssues {
-			m.issueList.SetSize(w, remain)
+			issueInnerW = full
 		}
-		return
+	case m.showCommits && m.showIssues:
+		leftOut := (m.w - gapW) / 2
+		rightOut := m.w - gapW - leftOut
+		commitInnerW = leftOut - 2
+		issueInnerW = rightOut - 2
+	default:
+		full := m.w - 2
+		if full < 1 {
+			full = 1
+		}
+		if m.showCommits {
+			commitInnerW = full
+		}
+		if m.showIssues {
+			issueInnerW = full
+		}
 	}
-	half := remain / 2
-	if !m.showCommits || !m.showIssues {
-		half = remain
+	if commitInnerW < 1 {
+		commitInnerW = 1
 	}
+	if issueInnerW < 1 {
+		issueInnerW = 1
+	}
+
 	if m.showCommits {
-		m.commitList.SetSize(w, half)
+		m.commitList.SetSize(commitInnerW, listH)
 	}
 	if m.showIssues {
-		m.issueList.SetSize(w, half)
+		m.issueList.SetSize(issueInnerW, listH)
 	}
 }
 
