@@ -11,9 +11,9 @@ const ChartTopUsers = 6
 
 // UserChartSeries is a stacked time-axis chart with one segment per contributor (plus "others").
 type UserChartSeries struct {
-	Users    []string           `json:"users"`
-	Buckets  []UserChartBucket  `json:"buckets"`
-	MaxTotal int                `json:"max_total"`
+	Users    []string          `json:"users"`
+	Buckets  []UserChartBucket `json:"buckets"`
+	MaxTotal int               `json:"max_total"`
 }
 
 // UserChartBucket holds per-user counts for one time bucket; Counts align with UserChartSeries.Users.

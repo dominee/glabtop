@@ -67,7 +67,7 @@ func renderHelpLine(m *Model) string {
 func renderStatusBar(m *Model) string {
 	st := m.styles
 	fp := currentFocus(m)
-	focusStr := lipgloss.NewStyle().Bold(true).Foreground(m.paletteAt(4)).Render("▶"+focusPaneLabel(fp)+" ")
+	focusStr := lipgloss.NewStyle().Bold(true).Foreground(m.paletteAt(4)).Render("▶" + focusPaneLabel(fp) + " ")
 
 	stale := ""
 	if m.snapshot != nil && m.snapshot.Stale {
@@ -355,7 +355,7 @@ func stackedTimeSeriesChart(m *Model, width, height int) string {
 			continue
 		}
 		lbl := bucketAxisLabel(m.tr, b.StartRFC3339, cw)
-		axis.WriteString(lipgloss.NewStyle().Foreground(m.paletteAt(6+j%8)).Render(lbl))
+		axis.WriteString(lipgloss.NewStyle().Foreground(m.paletteAt(6 + j%8)).Render(lbl))
 	}
 	rows = append(rows, axis.String())
 
@@ -432,7 +432,7 @@ func stackedUserChart(m *Model, width, height int) string {
 			continue
 		}
 		lbl := bucketAxisLabel(m.tr, b.StartRFC3339, cw)
-		axis.WriteString(lipgloss.NewStyle().Foreground(m.paletteAt(6+j%8)).Render(lbl))
+		axis.WriteString(lipgloss.NewStyle().Foreground(m.paletteAt(6 + j%8)).Render(lbl))
 	}
 	rows = append(rows, axis.String())
 

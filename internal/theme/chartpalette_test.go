@@ -7,12 +7,12 @@ import (
 
 func TestChartPaletteLen(t *testing.T) {
 	tm := &Theme{Colors: map[string]string{
-		"c1": "#ff6b6b",
-		"c2": "#4ecdc4",
-		"c3": "#ffe66d",
-		"c4": "#95e1d3",
-		"c5": "#f38181",
-		"c6": "#aa96da",
+		"c1":      "#ff6b6b",
+		"c2":      "#4ecdc4",
+		"c3":      "#ffe66d",
+		"c4":      "#95e1d3",
+		"c5":      "#f38181",
+		"c6":      "#aa96da",
 		"main_bg": "#2d3436",
 		"main_fg": "#dfe6e9",
 	}}

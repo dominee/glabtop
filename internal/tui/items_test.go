@@ -37,12 +37,12 @@ func TestCommitItem_strings(t *testing.T) {
 
 func TestIssueItem_strings(t *testing.T) {
 	it := issueItem{iss: model.IssueRow{
-		IID:         7,
-		Title:       "bug",
-		AuthorName:  "a",
+		IID:          7,
+		Title:        "bug",
+		AuthorName:   "a",
 		AssigneeName: "b",
-		ProjectPath: "g/p",
-		ClosedAt:    time.Date(2026, 3, 1, 10, 0, 0, 0, time.UTC),
+		ProjectPath:  "g/p",
+		ClosedAt:     time.Date(2026, 3, 1, 10, 0, 0, 0, time.UTC),
 	}}
 	if it.Title() == "" || it.Description() == "" {
 		t.Fatal(it.Title(), it.Description())

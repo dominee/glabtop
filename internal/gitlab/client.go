@@ -253,14 +253,14 @@ func (c *Client) FetchSnapshot(ctx context.Context, projects []model.ProjectRef,
 
 	globalAgg := newBucketAgg()
 	var (
-		allCommits      []model.CommitRow
-		allIssues       []model.IssueRow
-		openIssueCount  int
-		mu              sync.Mutex
-		wg              sync.WaitGroup
-		sem             = make(chan struct{}, 5)
-		firstErr        error
-		errMu           sync.Mutex
+		allCommits     []model.CommitRow
+		allIssues      []model.IssueRow
+		openIssueCount int
+		mu             sync.Mutex
+		wg             sync.WaitGroup
+		sem            = make(chan struct{}, 5)
+		firstErr       error
+		errMu          sync.Mutex
 	)
 
 	setErr := func(e error) {

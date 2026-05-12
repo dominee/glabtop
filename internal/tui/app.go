@@ -292,8 +292,8 @@ func (m *Model) applySnapshot(snap *model.Snapshot) {
 	}
 	m.snapshot = snap
 	m.enrichSeriesFromDB()
-		m.commitList.SetItems(commitItems(m.snapshot, m.theme))
-		m.issueList.SetItems(issueItems(m.snapshot, m.theme))
+	m.commitList.SetItems(commitItems(m.snapshot, m.theme))
+	m.issueList.SetItems(issueItems(m.snapshot, m.theme))
 }
 
 func (m *Model) enrichSeriesFromDB() {
